@@ -374,6 +374,85 @@ def search_similar_cbf(
         print(f"Id: {h.id} Score: {h.score:.4f}  File: {h.payload.get('path')}")
     return hits
 
+# PNG tools
+###############################################################################
+# IMAGE → PNG
+###############################################################################
+
+def image_to_png(
+    img: np.ndarray,
+    out_path: str,
+    clip_percentile: float | None = None,
+):
+    """
+    Save a 2D numpy image as a grayscale PNG.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2D array (H, W), int or float
+    out_path : str
+        Output PNG filename
+    clip_percentile : float | None
+        Optional percentile clipping (e.g. 99.5)
+    """
+
+    if img.ndim != 2:
+        raise ValueError(f"Expected 2D image, got shape {img.shape}")
+
+    print("orig", img)
+    img = img.astype(np.float32)
+
+    # Optional robust clipping (recommended for diffraction images)
+    if clip_percentile is not None:
+        lo = np.percentile(img, 100 - clip_percentile)
+        hi = np.percentile(img, clip_percentile)
+        img = np.clip(img, lo, hi)
+
+    vmin = img.min()
+    vmax = img.max()
+
+    if vmax <= vmin:
+        raise ValueError(f"Invalid intensity range: min={vmin}, max={vmax}")
+
+    # Normalize to 0–255
+    img_norm = (img - vmin) / (vmax - vmin)
+    img_u8 = np.clip(img_norm * 255.0, 0, 255).astype(np.uint8)
+    print("img_u8", img_u8)
+
+    pil = Image.fromarray(img_u8, mode="L")
+    pil.save(out_path)
+
+    return out_path
+
+def cbf_to_png(
+    cbf_path: str,
+    out_png: str | None = None,
+    clip_percentile: float | None = 99.5,
+):
+    """
+    Convert a CBF file directly to a PNG image.
+
+    Parameters
+    ----------
+    cbf_path : str
+        Input CBF file
+    out_png : str | None
+        Output PNG path (defaults to cbf_path + '.png')
+    clip_percentile : float | None
+        Percentile clipping (recommended: 99–99.9)
+    """
+
+    if out_png is None:
+        out_png = cbf_path + ".png"
+
+    img = read_cbf_image(cbf_path)
+    image_to_png(img, out_png, clip_percentile=clip_percentile)
+
+    print(f"PNG written: {out_png}")
+    return out_png
+
+
 # Example CLI usage
 def example_cli():
     import argparse
@@ -395,13 +474,18 @@ def cbf_to_qdrant():
     p = argparse.ArgumentParser()
     p.add_argument("path", help="Path to cbf file or directory of cbf files")
     p.add_argument("--method", default="resnet", choices=["resnet", "pixel"])
-    p.add_argument("--size", type=int, default=224)
+    p.add_argument("--vector-size", type=int, default=224, help="embedding vector size")
     p.add_argument("--collection", default="cbf_images")
     p.add_argument("--qdrant-path", default=None, help="Local Qdrant path (optional)")
     p.add_argument("--qdrant-host", default="localhost")
     p.add_argument("--qdrant-port", type=int, default=6333)
     p.add_argument("--search", action="store_true", help="Perform similarity search instead of ingest")
     p.add_argument("--limit", type=int, default=5)
+    p.add_argument("--write-png", action="store_true",
+               help="Write PNG visualization of CBF")
+    p.add_argument("--png-clip", type=float, default=99.5,
+               help="Percentile clipping for PNG")
+
 
     args = p.parse_args()
 
@@ -426,6 +510,8 @@ def cbf_to_qdrant():
             size=args.size,
             limit=args.limit
         )
+    elif args.write_png:
+        cbf_to_png(args.path, clip_percentile=args.png_clip)
     else:
         for f in files:
             ingest_cbf_to_qdrant(
