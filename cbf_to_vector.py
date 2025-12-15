@@ -315,6 +315,7 @@ def ingest_cbf_to_qdrant(
     # read + embed
     img = read_cbf_image(cbf_path)
     vec = image_to_embedding(img, method=method, size=size)
+    print("embedded vector", vec, len(vec))
 
     # ensure collection
     ensure_collection(client, collection_name, len(vec))
@@ -519,7 +520,7 @@ def cbf_to_qdrant():
                 client,
                 collection_name=args.collection,
                 method=args.method,
-                size=args.size
+                size=args.vector_size
             )
 
 # main
