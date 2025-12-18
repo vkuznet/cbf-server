@@ -36,7 +36,7 @@ def select_device():
 
 
 DEVICE = select_device()
-print("Selected %s device for inference")
+print(f"Selected {DEVICE} device for inference")
 
 # =========================
 # Model
