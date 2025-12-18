@@ -20,9 +20,22 @@ import torchvision.transforms as T
 
 EMBED_DIM = int(os.getenv("EMBED_DIM", "512"))
 RESNET_VARIANT = int(os.getenv("RESNET_VARIANT", "18"))
-DEVICE = os.getenv("DEVICE", "cpu")
-IMAGE_SIZE = 224
+IMAGE_SIZE = 512
 
+def select_device():
+    env = os.getenv("DEVICE", "").lower()
+
+    if env:
+        return env
+
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
+DEVICE = select_device()
 
 # =========================
 # Model
